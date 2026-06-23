@@ -15,15 +15,26 @@
 // along with this program. If not, see http://www.gnu.org/licenses/
 
 use clap::{Parser, Subcommand};
+use serde::Deserialize;
 use std::{
     error::Error,
     ffi::OsStr,
     fs,
-    io::{self, Write},
     path::{Path, PathBuf},
     process::Command,
 };
+use toml;
 use walkdir::WalkDir;
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    tbm: TBMConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct TBMConfig {
+    default_dir: String,
+}
 
 #[derive(Parser)]
 #[command(name = "tbm")]
@@ -32,8 +43,11 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short, long, global = true, default_value = "~/Documents/textbooks")]
-    dir: String,
+    #[arg(short, long, global = true)]
+    dir: Option<String>,
+
+    #[arg(global = true, default_value = "~/.config/tbm/config.toml")]
+    config: String,
 }
 
 #[derive(Subcommand)]
@@ -98,7 +112,7 @@ fn inter_pick_list(files: Vec<PathBuf>) -> Result<Option<PathBuf>, Box<dyn Error
         .join("\n");
 
     let options = SkimOptionsBuilder::default()
-        .height("50%")
+        .no_height(true)
         .multi(false)
         .prompt("tbm> ")
         .preview("file {}")
@@ -180,9 +194,35 @@ fn mode_add(dir: &Path, file: &Path, message: Option<&str>) -> Result<(), Box<dy
     Ok(())
 }
 
+fn load_config(config_dir: Option<&Path>) -> Result<Config, Box<dyn Error>> {
+    if let Some(dir) = config_dir {
+        let config = fs::read_to_string(dir)?;
+        dbg!(&config);
+        toml::from_str(&config)?
+    }
+
+    Ok(Config {
+        tbm: TBMConfig {
+            default_dir: "~/Documents/textbooks".into(),
+        },
+    })
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let dir = expand_tilde(&cli.dir);
+
+    let config_dir = expand_tilde(&cli.config);
+    let mut config = load_config(Some(&config_dir))?;
+
+    dbg!(&config);
+
+    let dir: PathBuf;
+    if let Some(_dir) = &cli.dir {
+        dir = expand_tilde(_dir);
+    } else {
+        dir = expand_tilde(&config.tbm.default_dir);
+    }
+    dbg!(&dir);
 
     match cli.command.unwrap_or(Commands::Open { query: None }) {
         Commands::Open { query } => mode_open(&dir, query.as_deref())?,

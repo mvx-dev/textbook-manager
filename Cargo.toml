@@ -2,12 +2,20 @@
 name = "tb-manager"
 version = "0.1.0"
 edition = "2024"
-description = "A basic textbook manager"
+description = "A basic CLI textbook manager"
 readme = "README.md"
-repository = "https://github.com/mvx-dev/textbook-manager"
 license = "GPL-3.0-or-later"
+authors = ["mvx-dev"]
+repository = "https://github.com/mvx-dev/textbook-manager"
+homepage = "https://github.com/mvx-dev/textbook-manager"
+
+[[bin]]
+name = "tb-manager"
+path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive", "env"] }
+serde = { version = "1.0.228", features = ["derive"] }
 skim = "4.8.0"
+toml = "1.1.2"
 walkdir = "2.5.0"
