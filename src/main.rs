@@ -43,11 +43,13 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
+    /// Location to look for documents
     #[arg(short, long, global = true)]
     dir: Option<String>,
 
-    #[arg(global = true, default_value = "~/.config/tbm/config.toml")]
-    config: String,
+    /// Location of configuration file
+    #[arg(short, long, global = true, default_value = "~/.config/tbm")]
+    config: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -194,25 +196,26 @@ fn mode_add(dir: &Path, file: &Path, message: Option<&str>) -> Result<(), Box<dy
     Ok(())
 }
 
-fn load_config(config_dir: Option<&Path>) -> Result<Config, Box<dyn Error>> {
-    if let Some(dir) = config_dir {
-        let config = fs::read_to_string(dir)?;
-        dbg!(&config);
-        toml::from_str(&config)?
-    }
+fn load_config(config_dir: &Option<String>) -> Result<Config, Box<dyn Error>> {
+    let config = if let Some(dir) = config_dir {
+        let path = expand_tilde(&dir);
+        let text = fs::read_to_string(path.join("config.toml"))?;
+        toml::from_str(&text)?
+    } else {
+        Config {
+            tbm: TBMConfig {
+                default_dir: "~/Documents/textbooks".into(),
+            },
+        }
+    };
 
-    Ok(Config {
-        tbm: TBMConfig {
-            default_dir: "~/Documents/textbooks".into(),
-        },
-    })
+    Ok(config)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    let config_dir = expand_tilde(&cli.config);
-    let mut config = load_config(Some(&config_dir))?;
+    let mut config = load_config(&cli.config)?;
 
     dbg!(&config);
 
