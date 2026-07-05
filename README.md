@@ -22,6 +22,9 @@ Eventually I want to add the following features
     - Default commit message
     - Default textbook directory
 - Directory structure. I would like to have subdirectories so I can break them up by subject (i.e. electromagnetism, quantum mechanics, calculus, etc.)
+- Automatic pulling from remote
+- Rofi integration (no need for terminal)
+- Generalise to all documents
 
 ---
 
