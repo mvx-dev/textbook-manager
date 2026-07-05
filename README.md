@@ -16,12 +16,15 @@ Note that currently the program assumes the textbook directory is already setup.
 # Future Features
 Eventually I want to add the following features
 
-- Proper fuzzy-finding (both interface and passed names)
-- Directory initialisation (setup the textbook directory for you, currently it assumes this directory is already initialised)
-- Configuration
-    - Default commit message
-    - Default textbook directory
-- Directory structure. I would like to have subdirectories so I can break them up by subject (i.e. electromagnetism, quantum mechanics, calculus, etc.)
+- [ ] Proper fuzzy-finding (both interface and passed names)
+- [ ] Directory initialisation (setup the textbook directory for you, currently it assumes this directory is already initialised)
+- [ ] Configuration
+    - [ ] Default commit message
+    - [x] Default textbook directory
+- [ ] Directory structure. I would like to have subdirectories so I can break them up by subject (i.e. electromagnetism, quantum mechanics, calculus, etc.)
+- [ ] Automatic pulling from remote
+- [ ] Rofi integration (no need for terminal)
+- [ ] Generalise to all documents
 
 ---
 
