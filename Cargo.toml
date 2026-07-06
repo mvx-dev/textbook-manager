@@ -9,6 +9,7 @@ license = "GPL-3.0-or-later"
 
 [[bin]]
 name = "tbm"
+path = "src/main.rs"
 test = false
 bench = false
 
