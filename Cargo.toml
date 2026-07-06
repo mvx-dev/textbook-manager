@@ -10,8 +10,10 @@ repository = "https://github.com/mvx-dev/textbook-manager"
 homepage = "https://github.com/mvx-dev/textbook-manager"
 
 [[bin]]
-name = "tb-manager"
+name = "tbm"
 path = "src/main.rs"
+test = false
+bench = false
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive", "env"] }

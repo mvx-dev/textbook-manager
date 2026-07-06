@@ -16,6 +16,7 @@
 
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
+use skim::prelude::*;
 use std::{
     error::Error,
     ffi::OsStr,
@@ -54,15 +55,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Open {
-        query: Option<String>,
-    },
+    /// Attempt to open an optional query
+    Open { query: Option<String> },
+    /// Add a specified document to the database
     Add {
         file: PathBuf,
         message: Option<String>,
     },
 }
 
+// TODO remove/generalise this
 fn list_pdfs(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut out = Vec::new();
     for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
@@ -105,8 +107,6 @@ fn inter_pick(files: &[PathBuf]) -> Result<Option<PathBuf>, Box<dyn Error>> {
 }
 
 fn inter_pick_list(files: Vec<PathBuf>) -> Result<Option<PathBuf>, Box<dyn Error>> {
-    use skim::prelude::*;
-
     let input = files
         .iter()
         .map(|p| p.display().to_string())
