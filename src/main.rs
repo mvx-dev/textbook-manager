@@ -61,6 +61,7 @@ enum Commands {
         file: PathBuf,
         message: Option<String>,
     },
+    List,
 }
 
 fn list_pdfs(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -196,6 +197,15 @@ fn mode_add(dir: &Path, file: &Path, message: Option<&str>) -> Result<(), Box<dy
     Ok(())
 }
 
+fn mode_list(dir: &Path) -> Result<(), Box<dyn Error>> {
+    list_pdfs(dir)?
+        .iter()
+        .filter_map(|p| p.file_name())
+        .for_each(|name| println!("{}", name.to_string_lossy()));
+
+    Ok(())
+}
+
 fn load_config(config_dir: &Option<String>) -> Result<Config, Box<dyn Error>> {
     let config = if let Some(dir) = config_dir {
         let path = expand_tilde(&dir);
@@ -217,7 +227,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut config = load_config(&cli.config)?;
 
-    dbg!(&config);
+    // dbg!(&config);
 
     let dir: PathBuf;
     if let Some(_dir) = &cli.dir {
@@ -225,11 +235,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         dir = expand_tilde(&config.tbm.default_dir);
     }
-    dbg!(&dir);
+    // dbg!(&dir);
 
     match cli.command.unwrap_or(Commands::Open { query: None }) {
         Commands::Open { query } => mode_open(&dir, query.as_deref())?,
         Commands::Add { file, message } => mode_add(&dir, &file, message.as_deref())?,
+        Commands::List => mode_list(&dir)?,
     }
 
     Ok(())
