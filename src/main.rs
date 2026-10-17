@@ -39,6 +39,7 @@ struct TBMConfig {
 #[derive(Parser)]
 #[command(name = "tbm")]
 #[command(about = "Manage textbook PDFs", long_about = None)]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
