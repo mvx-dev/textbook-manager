@@ -28,6 +28,22 @@ use std::{
 use toml;
 use walkdir::WalkDir;
 
+trait ExpandTildeExt {
+    fn expand_tilde(&self) -> PathBuf;
+}
+
+impl ExpandTildeExt for str {
+    fn expand_tilde(&self) -> PathBuf {
+        expand_tilde(self)
+    }
+}
+
+impl ExpandTildeExt for String {
+    fn expand_tilde(&self) -> PathBuf {
+        expand_tilde(self)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct Config {
     tbm: TBMConfig,
@@ -35,7 +51,7 @@ struct Config {
 
 #[derive(Debug, Deserialize)]
 struct TBMConfig {
-    default_dir: String,
+    default_dir: Option<PathBuf>,
 }
 
 #[derive(Parser)]
@@ -218,26 +234,53 @@ fn mode_list(dir: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn mode_init(dir: &Path, uri: &Option<String>) -> Result<(), Box<dyn Error>> {
+fn mode_init(dir: &Option<PathBuf>, uri: &Option<String>) -> Result<PathBuf, Box<dyn Error>> {
+    let dir: PathBuf = match dir {
+        Some(dir) => dir.clone(),
+        None => loop {
+            print!("Enter textbook directory (default ~/Documents/textbooks): ");
+            io::stdout().flush()?;
+
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+
+            let input = match input.trim() {
+                "" => "~/Documents/textbooks".to_owned(),
+                dir => dir.to_owned(),
+            }
+            .expand_tilde();
+
+            print!("Confirm directory {}? [Y/n]: ", dir_to_str(&input)?);
+            io::stdout().flush()?;
+
+            let mut confirm = String::new();
+            io::stdin().read_line(&mut confirm)?;
+
+            if confirm.trim().eq_ignore_ascii_case("n") {
+                continue;
+            }
+
+            break input;
+        },
+    };
+
     match check_init(&dir) {
         DirectoryState::Initialised => {
             println!("Directory already initialised");
-            return Ok(());
+            return Ok(dir);
         }
-        DirectoryState::NotExists => fs::create_dir_all(dir)?,
+        DirectoryState::NotExists => fs::create_dir_all(&dir)?,
         DirectoryState::NotInitialised => (),
     }
 
     let uri: String = match uri {
-        Some(uri) => uri.into(),
+        Some(uri) => uri.clone(),
         None => loop {
             print!("Enter remote URI: ");
-            io::stdout().flush().expect("failed to flush stdout");
+            io::stdout().flush()?;
 
             let mut input = String::new();
-            io::stdin()
-                .read_line(&mut input)
-                .expect("failed to read line");
+            io::stdin().read_line(&mut input)?;
 
             let input = input.trim();
             if input.is_empty() {
@@ -246,12 +289,10 @@ fn mode_init(dir: &Path, uri: &Option<String>) -> Result<(), Box<dyn Error>> {
             }
 
             print!("Confirm URI [{input}] [Y/n]: ");
-            io::stdout().flush().expect("failed to flush stdout");
+            io::stdout().flush()?;
 
             let mut confirm = String::new();
-            io::stdin()
-                .read_line(&mut confirm)
-                .expect("failed to read line");
+            io::stdin().read_line(&mut confirm)?;
 
             if confirm.trim().eq_ignore_ascii_case("n") {
                 continue;
@@ -261,38 +302,28 @@ fn mode_init(dir: &Path, uri: &Option<String>) -> Result<(), Box<dyn Error>> {
         },
     };
 
-    run_cmd("git", &["-C", dir_to_str(dir)?, "init"])?;
-    run_cmd("git", &["-C", dir_to_str(dir)?, "lfs", "install"])?;
+    let dir_str = dir_to_str(&dir)?;
+
+    run_cmd("git", &["-C", dir_str, "init"])?;
+    run_cmd("git", &["-C", dir_str, "lfs", "install"])?;
     run_cmd(
         "git",
-        &[
-            "-C",
-            dir_to_str(dir)?,
-            "remote",
-            "add",
-            "origin",
-            uri.as_str(),
-        ],
+        &["-C", dir_str, "remote", "add", "origin", uri.as_str()],
     )?;
+
     if run_cmd(
         "git",
-        &[
-            "-C",
-            dir_to_str(dir)?,
-            "pull",
-            "--set-upstream",
-            "origin",
-            "main",
-        ],
+        &["-C", dir_str, "pull", "--set-upstream", "origin", "main"],
     )
-    .is_ok()
+    .is_err()
     {
-        return run_cmd("git", &["-C", dir_to_str(dir)?, "pull"]);
-    } else {
-        println!("invalid remote");
-        fs::remove_dir_all(Path::join(dir, ".git"))?;
-        Ok(())
+        fs::remove_dir_all(dir.join(".git"))?;
+        return Err(
+            "could not pull from remote (invalid URI, no access, or no `main` branch)".into(),
+        );
     }
+
+    Ok(dir)
 }
 
 fn load_config(config_dir: &Option<String>) -> Result<Config, Box<dyn Error>> {
@@ -302,9 +333,7 @@ fn load_config(config_dir: &Option<String>) -> Result<Config, Box<dyn Error>> {
         toml::from_str(&text)?
     } else {
         Config {
-            tbm: TBMConfig {
-                default_dir: "~/Documents/textbooks".into(),
-            },
+            tbm: TBMConfig { default_dir: None },
         }
     };
 
@@ -321,9 +350,15 @@ fn check_init(dir: &Path) -> DirectoryState {
     DirectoryState::NotExists
 }
 
-fn ensure_initialised(dir: &Path) -> anyhow::Result<()> {
+fn ensure_initialised(dir: &Option<PathBuf>) -> anyhow::Result<&PathBuf> {
+    let Some(dir) = dir else {
+        return Err(anyhow!(
+            "directory not specified; run `tbm init` to configure"
+        ));
+    };
+
     match check_init(dir) {
-        DirectoryState::Initialised => Ok(()),
+        DirectoryState::Initialised => Ok(dir),
         DirectoryState::NotExists => Err(anyhow!(
             "directory does not exist; run `tbm init` to initialise it"
         )),
@@ -339,25 +374,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = load_config(&cli.config)?;
 
     let dir = match &cli.dir {
-        Some(dir) => expand_tilde(dir),
-        None => expand_tilde(&config.tbm.default_dir),
+        Some(dir) => &Some(expand_tilde(dir)),
+        None => &config.tbm.default_dir,
     };
 
     match cli.command.unwrap_or(Commands::Open { query: None }) {
-        Commands::Init { remote } => mode_init(&dir, &remote)?,
+        Commands::Init { remote } => {
+            mode_init(&dir, &remote)?;
+        }
         Commands::Open { query } => {
-            ensure_initialised(&dir)?;
-            mode_open(&dir, query.as_deref())?;
+            let dir = ensure_initialised(dir)?;
+            mode_open(dir, query.as_deref())?;
         }
         Commands::Add { file, message } => {
-            ensure_initialised(&dir)?;
-            mode_add(&dir, &file, message.as_deref())?;
+            let dir = ensure_initialised(&dir)?;
+            mode_add(dir, &file, message.as_deref())?;
         }
         Commands::List => {
-            ensure_initialised(&dir)?;
-            mode_list(&dir)?;
+            let dir = ensure_initialised(&dir)?;
+            mode_list(dir)?;
         }
     }
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

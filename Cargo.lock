@@ -2955,6 +2955,7 @@ dependencies = [
  "clap",
  "serde",
  "skim",
+ "tempfile",
  "toml",
  "walkdir",
 ]

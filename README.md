@@ -4,8 +4,11 @@
 # Textbook Manager
 This is a simple CLI tool to manage my textbooks PDFs, or any other file that I need.
 
+# Installation
+To install this project, clone the repository and run `make` in the cloned directory. It will prompt you for the URI of the remote repository, and the directory to place all your documents (if you don't have a configuration file configured).
+
 # Usage
-There are two modes to this: `add` and `open`. If not specified, `open` mode will be used by default.
+There are three modes available: `list`, `add`, and `open`. If not specified, `open` mode will be used by default.
 
 In `add` mode, pass a path to a (usually) PDF. This will then copy that PDF to the textbook directory (in this case it defaults to `~/Documents/textbooks/`), track it with `git-lfs`, and commit it to the repo configured there.
 
@@ -17,7 +20,7 @@ Note that currently the program assumes the textbook directory is already setup.
 Eventually I want to add the following features
 
 - [ ] Proper fuzzy-finding (both interface and passed names)
-- [ ] Directory initialisation (setup the textbook directory for you, currently it assumes this directory is already initialised)
+- [x] Directory initialisation (setup the textbook directory for you, currently it assumes this directory is already initialised)
 - [ ] Configuration
     - [ ] Default commit message
     - [x] Default textbook directory
@@ -25,6 +28,9 @@ Eventually I want to add the following features
 - [ ] Automatic pulling from remote
 - [ ] Rofi integration (no need for terminal)
 - [ ] Generalise to all documents
+- [ ] Local-only repository support
+- [ ] Name collision prevention
+- [ ] Document metadata (i.e. author, title, subject, etc)
 
 ---
 
