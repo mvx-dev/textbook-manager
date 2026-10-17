@@ -14,6 +14,7 @@ name = "tb-manager"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.104"
 clap = { version = "4.6.1", features = ["derive", "env"] }
 serde = { version = "1.0.228", features = ["derive"] }
 skim = "4.8.0"

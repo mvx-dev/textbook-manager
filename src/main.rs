@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see http://www.gnu.org/licenses/
 
+use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use std::{
@@ -67,6 +68,12 @@ enum Commands {
     Init {
         remote: Option<String>,
     },
+}
+
+enum DirectoryState {
+    NotExists,
+    NotInitialised,
+    Initialised,
 }
 
 fn list_pdfs(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -212,13 +219,13 @@ fn mode_list(dir: &Path) -> Result<(), Box<dyn Error>> {
 }
 
 fn mode_init(dir: &Path, uri: &Option<String>) -> Result<(), Box<dyn Error>> {
-    if fs::exists(dir).is_ok_and(|b| b) {
-        if fs::exists(Path::join(dir, ".git")).is_ok_and(|b| b) {
+    match check_init(&dir) {
+        DirectoryState::Initialised => {
             println!("Directory already initialised");
             return Ok(());
         }
-    } else {
-        fs::create_dir(dir)?;
+        DirectoryState::NotExists => fs::create_dir_all(dir)?,
+        DirectoryState::NotInitialised => (),
     }
 
     let uri: String = match uri {
@@ -304,26 +311,52 @@ fn load_config(config_dir: &Option<String>) -> Result<Config, Box<dyn Error>> {
     Ok(config)
 }
 
+fn check_init(dir: &Path) -> DirectoryState {
+    if fs::exists(dir).is_ok_and(|b| b) {
+        if fs::exists(Path::join(dir, ".git")).is_ok_and(|b| b) {
+            return DirectoryState::Initialised;
+        }
+        return DirectoryState::NotInitialised;
+    }
+    DirectoryState::NotExists
+}
+
+fn ensure_initialised(dir: &Path) -> anyhow::Result<()> {
+    match check_init(dir) {
+        DirectoryState::Initialised => Ok(()),
+        DirectoryState::NotExists => Err(anyhow!(
+            "directory does not exist; run `tbm init` to initialise it"
+        )),
+        DirectoryState::NotInitialised => Err(anyhow!(
+            "directory is not correctly initialised; run `tbm init` to initialise it"
+        )),
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    let mut config = load_config(&cli.config)?;
+    let config = load_config(&cli.config)?;
 
-    // dbg!(&config);
-
-    let dir: PathBuf;
-    if let Some(_dir) = &cli.dir {
-        dir = expand_tilde(_dir);
-    } else {
-        dir = expand_tilde(&config.tbm.default_dir);
-    }
-    dbg!(&dir);
+    let dir = match &cli.dir {
+        Some(dir) => expand_tilde(dir),
+        None => expand_tilde(&config.tbm.default_dir),
+    };
 
     match cli.command.unwrap_or(Commands::Open { query: None }) {
-        Commands::Open { query } => mode_open(&dir, query.as_deref())?,
-        Commands::Add { file, message } => mode_add(&dir, &file, message.as_deref())?,
-        Commands::List => mode_list(&dir)?,
         Commands::Init { remote } => mode_init(&dir, &remote)?,
+        Commands::Open { query } => {
+            ensure_initialised(&dir)?;
+            mode_open(&dir, query.as_deref())?;
+        }
+        Commands::Add { file, message } => {
+            ensure_initialised(&dir)?;
+            mode_add(&dir, &file, message.as_deref())?;
+        }
+        Commands::List => {
+            ensure_initialised(&dir)?;
+            mode_list(&dir)?;
+        }
     }
 
     Ok(())
