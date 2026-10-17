@@ -22,9 +22,11 @@ run:
 
 install_debug: uninstall build
 	@cp target/debug/$(EXEC_NAME) $(INSTALL_DIR)/bin/$(APP_NAME)
+	@$(INSTALL_DIR)/bin/$(APP_NAME) init
 
 install: uninstall build_release
 	@cp target/release/$(EXEC_NAME) $(INSTALL_DIR)/bin/$(APP_NAME)
+	@$(INSTALL_DIR)/bin/$(APP_NAME) init
 
 clean_install: install clean
 
