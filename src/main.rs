@@ -20,6 +20,7 @@ use std::{
     error::Error,
     ffi::OsStr,
     fs,
+    io::{self, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -63,6 +64,9 @@ enum Commands {
         message: Option<String>,
     },
     List,
+    Init {
+        remote: Option<String>,
+    },
 }
 
 fn list_pdfs(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -207,6 +211,83 @@ fn mode_list(dir: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn mode_init(dir: &Path, uri: &Option<String>) -> Result<(), Box<dyn Error>> {
+    if fs::exists(dir).is_ok_and(|b| b) {
+        if fs::exists(Path::join(dir, ".git")).is_ok_and(|b| b) {
+            println!("Directory already initialised");
+            return Ok(());
+        }
+    } else {
+        fs::create_dir(dir)?;
+    }
+
+    let uri: String = match uri {
+        Some(uri) => uri.into(),
+        None => loop {
+            print!("Enter remote URI: ");
+            io::stdout().flush().expect("failed to flush stdout");
+
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .expect("failed to read line");
+
+            let input = input.trim();
+            if input.is_empty() {
+                // TODO allow local-only repos
+                eprintln!("URI cannot be empty.");
+            }
+
+            print!("Confirm URI [{input}] [Y/n]: ");
+            io::stdout().flush().expect("failed to flush stdout");
+
+            let mut confirm = String::new();
+            io::stdin()
+                .read_line(&mut confirm)
+                .expect("failed to read line");
+
+            if confirm.trim().eq_ignore_ascii_case("n") {
+                continue;
+            }
+
+            break input.to_owned();
+        },
+    };
+
+    run_cmd("git", &["-C", dir_to_str(dir)?, "init"])?;
+    run_cmd("git", &["-C", dir_to_str(dir)?, "lfs", "install"])?;
+    run_cmd(
+        "git",
+        &[
+            "-C",
+            dir_to_str(dir)?,
+            "remote",
+            "add",
+            "origin",
+            uri.as_str(),
+        ],
+    )?;
+    if run_cmd(
+        "git",
+        &[
+            "-C",
+            dir_to_str(dir)?,
+            "pull",
+            "--set-upstream",
+            "origin",
+            "main",
+        ],
+    )
+    .is_ok()
+    {
+        return run_cmd("git", &["-C", dir_to_str(dir)?, "pull"]);
+    } else {
+        println!("invalid remote");
+        fs::remove_dir_all(Path::join(dir, ".git"))?;
+        Ok(())
+    }
+}
+
 fn load_config(config_dir: &Option<String>) -> Result<Config, Box<dyn Error>> {
     let config = if let Some(dir) = config_dir {
         let path = expand_tilde(&dir);
@@ -236,12 +317,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         dir = expand_tilde(&config.tbm.default_dir);
     }
-    // dbg!(&dir);
+    dbg!(&dir);
 
     match cli.command.unwrap_or(Commands::Open { query: None }) {
         Commands::Open { query } => mode_open(&dir, query.as_deref())?,
         Commands::Add { file, message } => mode_add(&dir, &file, message.as_deref())?,
         Commands::List => mode_list(&dir)?,
+        Commands::Init { remote } => mode_init(&dir, &remote)?,
     }
 
     Ok(())
