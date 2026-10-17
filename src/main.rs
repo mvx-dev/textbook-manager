@@ -94,9 +94,19 @@ enum DirectoryState {
 
 fn list_pdfs(dir: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut out = Vec::new();
-    for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+
+    let walker = WalkDir::new(dir)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|e| e.file_name() != ".git");
+
+    for entry in walker.filter_map(Result::ok) {
         let p = entry.path();
-        if p.is_file() && p.extension() == Some(OsStr::new("pdf")) {
+        let is_pdf = p
+            .extension()
+            .and_then(OsStr::to_str)
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"));
+        if p.is_file() && is_pdf {
             out.push(p.to_path_buf());
         }
     }
