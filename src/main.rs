@@ -173,8 +173,11 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<(), Box<dyn Error>> {
 }
 
 fn expand_tilde(s: &str) -> PathBuf {
-    if let Some(rest) = s.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME") {
+    if let Some(home) = std::env::var_os("HOME") {
+        if s == "~" {
+            return PathBuf::from(home);
+        }
+        if let Some(rest) = s.strip_prefix("~/") {
             return PathBuf::from(home).join(rest);
         }
     }
